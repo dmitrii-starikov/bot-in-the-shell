@@ -1,9 +1,2 @@
 .env
 todos.txt
-# директория для загрузки внешних файлов и их обработки в миграциях
-/migrations/tmp/
-/sandbox/tmp/
-/venv/
-/configs/exchange/private/
-/configs/signals/private/
-/.idea/
