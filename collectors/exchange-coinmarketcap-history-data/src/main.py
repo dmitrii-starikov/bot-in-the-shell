@@ -54,7 +54,7 @@ def init_db(conn):
     """Создаёт таблицу если не существует."""
     with conn.cursor() as cur:
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS histroric_coinmarketcap_daily_candles (
+            CREATE TABLE IF NOT EXISTS historic_coinmarketcap_daily_candles (
                 id             SERIAL PRIMARY KEY,
                 coin           VARCHAR(10)  NOT NULL,
                 date           DATE         NOT NULL,
@@ -72,12 +72,12 @@ def init_db(conn):
             )
         """)
         conn.commit()
-    print("[db] ✓ Таблица histroric_coinmarketcap_daily_candles готова")
+    print("[db] ✓ Таблица historic_coinmarketcap_daily_candles готова")
 
 
 def insert_candle(cur, coin: str, doc: dict):
     cur.execute("""
-        INSERT INTO histroric_coinmarketcap_daily_candles
+        INSERT INTO historic_coinmarketcap_daily_candles
             (coin, date, open_price, high_price, low_price, close_price,
              avg_price, volume, market_cap, time_open, time_close)
         VALUES
@@ -220,7 +220,7 @@ def do_publish(coin: str | None = None, date_from: str | None = None, date_to: s
     where = ("WHERE " + " AND ".join(filters)) if filters else ""
 
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(f"SELECT * FROM histroric_coinmarketcap_daily_candles {where} ORDER BY coin, date", params)
+        cur.execute(f"SELECT * FROM historic_coinmarketcap_daily_candles {where} ORDER BY coin, date", params)
         rows = cur.fetchall()
 
     print(f"[publish] Публикую {len(rows)} свечей в {TOPIC}...")
@@ -234,6 +234,97 @@ def do_publish(coin: str | None = None, date_from: str | None = None, date_to: s
     print(f"[publish] ✓ Готово")
 
 
+# ─── Симуляция биржевого потока ───────────────────────────────────────────────
+
+def candle_to_ticks(row: dict) -> list[dict]:
+    """
+    Из одной дневной свечи генерирует 5 тиков в хронологическом порядке.
+
+    Логика как в старом TestStrategy.getPriceGenerator:
+    - Бычий день (close > open): open → low → mid → high → close
+    - Медвежий день (close < open): open → high → mid → low → close
+
+    Временны́е метки равномерно распределены по дню (каждые ~4.8 часа).
+    """
+    asset      = row["coin"].upper()
+    ts_open    = int(row["time_open"].timestamp() * 1000)
+    day_ms     = 86400 * 1000
+    step_ms    = day_ms // 5  # ~4.8 часа между тиками
+
+    o = row["open_price"]
+    h = row["high_price"]
+    l = row["low_price"]
+    c = row["close_price"]
+    v = row["volume"]
+    mid = round((h + l) / 2, 8)
+
+    bullish = c >= o
+    prices = [o, l, mid, h, c] if bullish else [o, h, mid, l, c]
+
+    ticks = []
+    for i, price in enumerate(prices):
+        ts = ts_open + i * step_ms
+        ticks.append({
+            "asset":        asset,
+            "quote":        QUOTE_SYMBOL,
+            "exchange":     "simulation",
+            "price":        price,
+            "volume":       v // 5,
+            "interval":     "tick",
+            "timestamp_ms": ts,
+            "date": datetime.datetime.fromtimestamp(ts / 1000).strftime("%Y-%m-%d %H:%M:%S"),
+            "candle_id":    f"{asset}{QUOTE_SYMBOL}_tick_{ts}",
+        })
+
+    return ticks
+
+
+def do_publish_simulation(
+    coin: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    delay_ms: int = 0,          # пауза между тиками в мс (0 = максимальная скорость)
+):
+    """Читает свечи из БД и пушит тики в Kafka как симуляция биржи."""
+    conn = get_conn()
+
+    producer = KafkaProducer(
+        bootstrap_servers=KAFKA_URL,
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
+
+    filters = []
+    params  = {}
+    if coin:
+        filters.append("coin = %(coin)s")
+        params["coin"] = coin
+    if date_from:
+        filters.append("date >= %(date_from)s")
+        params["date_from"] = date_from
+    if date_to:
+        filters.append("date <= %(date_to)s")
+        params["date_to"] = date_to
+
+    where = ("WHERE " + " AND ".join(filters)) if filters else ""
+
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(f"SELECT * FROM historic_coinmarketcap_daily_candles {where} ORDER BY coin, date", params)
+        rows = cur.fetchall()
+
+    total_ticks = len(rows) * 5
+    print(f"[simulate] Свечей: {len(rows)} → тиков: {total_ticks}")
+    print(f"[simulate] Топик: {TOPIC}  delay={delay_ms}ms")
+
+    for row in tqdm(rows, desc="simulate"):
+        for tick in candle_to_ticks(dict(row)):
+            producer.send(TOPIC, value=tick)
+            if delay_ms > 0:
+                time.sleep(delay_ms / 1000)
+
+    producer.flush()
+    conn.close()
+    print(f"[simulate] ✓ Готово. Отправлено тиков: {total_ticks}")
+
 # ─── Точка входа ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -246,6 +337,12 @@ if __name__ == "__main__":
         date_from = os.environ.get("PUBLISH_DATE_FROM")  # 2023-01-01
         date_to   = os.environ.get("PUBLISH_DATE_TO")    # 2024-01-01
         do_publish(coin, date_from, date_to)
+    elif cmd == "simulate":
+        coin      = os.environ.get("PUBLISH_COIN")
+        date_from = os.environ.get("PUBLISH_DATE_FROM")
+        date_to   = os.environ.get("PUBLISH_DATE_TO")
+        delay_ms  = int(os.environ.get("SIMULATE_DELAY_MS", "0"))
+        do_publish_simulation(coin, date_from, date_to, delay_ms)
     elif cmd == "all":
         do_fetch()
         do_publish()

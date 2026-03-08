@@ -22,3 +22,7 @@ $(SVC)-test:
 # build
 $(SVC)-build:
 	$(DC) build
+
+# simulate — пушит тики (5 на свечу) как симуляция биржи
+$(SVC)-simulate:
+	$(DC) run --rm $(SVC) python src/main.py simulate
