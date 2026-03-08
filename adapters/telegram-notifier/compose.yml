@@ -16,4 +16,5 @@ services:
 
 networks:
   bot-network:
+    name: ${COMPOSE_PROJECT_NAME}-network
     external: true

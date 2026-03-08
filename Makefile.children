@@ -1,1 +1,9 @@
+# Collectors
+-include collectors/exchange-coinmarketcap-history-data/Makefile
+
+# Analyzers
+
+# Solver
+
+# Adapters
 -include adapters/telegram-notifier/Makefile

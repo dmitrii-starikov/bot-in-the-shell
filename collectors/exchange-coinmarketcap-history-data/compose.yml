@@ -1,0 +1,16 @@
+services:
+  exchange-coinmarketcap-history-data:
+    build: .
+    container_name: ${COMPOSE_PROJECT_NAME}-exchange-coinmarketcap-history-data
+    env_file:
+      - ../../.env        # общие: DB, Kafka
+      - .env              # своё: YEAR_FROM, COINMARKETCAP_*
+    volumes:
+      - ./tmp:/app/tmp   # кеш скачанных JSON чтобы не перекачивать
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    name: ${COMPOSE_PROJECT_NAME}-network
+    external: true

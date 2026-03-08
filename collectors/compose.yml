@@ -1,0 +1,2 @@
+include:
+  - exchange-coinmarketcap-history-data/compose.yml

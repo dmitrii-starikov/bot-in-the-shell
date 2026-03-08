@@ -11,18 +11,18 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-kafka
     #restart: unless-stopped
     ports:
-      - "${KAFKA_PORT}:9092"
+      - "${KAFKA_PORT}:29092"
     environment:
       # ── Роль и идентификация ──────────────────────────────────────────────
       KAFKA_NODE_ID: 1                        # ID брокера в кластере
       KAFKA_PROCESS_ROLES: broker,controller  # KRaft: совмещаем брокер и контроллер в одном процессе
       CLUSTER_ID: "${KAFKA_CLUSTER_ID}"       # уникальный ID кластера, генерируется один раз
       # ── Сетевые адреса ────────────────────────────────────────────────────
-      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092,CONTROLLER://kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092,CONTROLLER://kafka:9093
       #   PLAINTEXT      — для других контейнеров внутри docker-сети
       #   PLAINTEXT_HOST — для подключения с хост-машины
       #   CONTROLLER     — внутренний канал KRaft, не для клиентов
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
       #   адреса которые Kafka сообщает клиентам после подключения (CONTROLLER сюда не входит)
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
       #   все три listener'а используют PLAINTEXT (без шифрования)
