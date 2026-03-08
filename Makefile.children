@@ -2,6 +2,7 @@
 -include collectors/exchange-coinmarketcap-history-data/Makefile
 
 # Analyzers
+-include analyzers/sigma_analyzer/Makefile
 
 # Solver
 

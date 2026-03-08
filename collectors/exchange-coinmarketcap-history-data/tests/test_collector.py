@@ -16,7 +16,7 @@ sys.modules["orjson"]  = unittest.mock.MagicMock()
 os.environ.update({
     "DB_HOST": "localhost", "DB_PORT": "5432", "DB_NAME": "botdb",
     "DB_USER": "bot", "DB_PASSWORD": "bot",
-    "KAFKA_URL": "localhost:9092",
+    "KAFKA_URL": "kafka:9092",
     "COINMARKETCAP_BTC_ID": "1",
     "COINMARKETCAP_ETH_ID": "1027",
     "COINMARKETCAP_BNB_ID": "1839",
