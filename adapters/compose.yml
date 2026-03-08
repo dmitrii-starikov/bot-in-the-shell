@@ -1,0 +1,2 @@
+include:
+  - telegram-notifier/compose.yml
