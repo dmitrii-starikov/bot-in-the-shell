@@ -1,0 +1,85 @@
+include:
+  - collectors/compose.yml
+  - analyzers/compose.yml
+  - solver/compose.yml
+  - adapters/compose.yml
+
+# infrastructure
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: ${COMPOSE_PROJECT_NAME}-kafka
+    #restart: unless-stopped
+    ports:
+      - "${KAFKA_PORT}:9092"
+    environment:
+      # ── Роль и идентификация ──────────────────────────────────────────────
+      KAFKA_NODE_ID: 1                        # ID брокера в кластере
+      KAFKA_PROCESS_ROLES: broker,controller  # KRaft: совмещаем брокер и контроллер в одном процессе
+      CLUSTER_ID: "${KAFKA_CLUSTER_ID}"       # уникальный ID кластера, генерируется один раз
+      # ── Сетевые адреса ────────────────────────────────────────────────────
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092,CONTROLLER://kafka:9093
+      #   PLAINTEXT      — для других контейнеров внутри docker-сети
+      #   PLAINTEXT_HOST — для подключения с хост-машины
+      #   CONTROLLER     — внутренний канал KRaft, не для клиентов
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092
+      #   адреса которые Kafka сообщает клиентам после подключения (CONTROLLER сюда не входит)
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      #   все три listener'а используют PLAINTEXT (без шифрования)
+      # ── Внутренние настройки ──────────────────────────────────────────────
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT      # listener для общения между брокерами
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER      # listener для KRaft-коммуникации
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093     # список controller-узлов: id@host:port
+      # ── Поведение топиков ─────────────────────────────────────────────────
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"          # топик создаётся автоматически при первой записи
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1        # нужно явно указать 1 иначе Kafka ждёт 3 реплики
+      KAFKA_LOG_RETENTION_HOURS: ${KAFKA_LOG_RETENTION_HOURS} # сколько хранить сообщения
+    networks:
+      - bot-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Смотреть топики в браузере: http://localhost:${KAFKA_UI_PORT}
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: ${COMPOSE_PROJECT_NAME}-kafka-ui
+    depends_on: [kafka]
+    ports:
+      - "${KAFKA_UI_PORT}:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    networks:
+      - bot-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${COMPOSE_PROJECT_NAME}-postgres
+    #restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - bot-postgres-data:/var/lib/postgresql/data
+    networks:
+      - bot-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+networks:
+  bot-network:
+    name: ${COMPOSE_PROJECT_NAME}-network
+    driver: bridge
+
+volumes:
+  bot-postgres-data:
