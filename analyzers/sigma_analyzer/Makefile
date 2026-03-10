@@ -15,3 +15,6 @@ sigma-analyzer-test:
 
 sigma-analyzer-build:
 	$(_SIGMA_DC) build
+
+sigma-analyzer-eval:
+	$(_SIGMA_DC) run --rm sigma-analyzer python src/main.py eval

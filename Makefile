@@ -20,6 +20,9 @@ reset: remove start
 
 restart: stop start
 
+save-context:
+	ls
+
 ##Makefile.local
 -include Makefile.local
 -include Makefile.children
