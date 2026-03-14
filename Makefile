@@ -57,6 +57,25 @@ save-context:
 	echo ""; \
 	echo "Контекст сохранён в $$OUT ($$(wc -l < $$OUT) строк)"
 
+init-env:
+	@echo "Инициализация .env файлов из .env.dist..."; \
+	count=0; \
+	for dist in $$(find . -name ".env.dist" \
+	        -not -path '*/\.git/*' \
+	        -not -path '*/_archives/*' \
+	        | sort); do \
+	    env=$$(dirname $$dist)/.env; \
+	    if [ ! -f "$$env" ]; then \
+	        cp "$$dist" "$$env"; \
+	        echo "  ✓ создан  $$env"; \
+	        count=$$((count + 1)); \
+	    else \
+	        echo "  ─ есть    $$env"; \
+	    fi; \
+	done; \
+	echo ""; \
+	echo "Готово. Создано: $$count файлов. Заполни значения и запускай make up"
+
 ##Makefile.local
 -include Makefile.local
 -include Makefile.children
