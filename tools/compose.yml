@@ -1,0 +1,2 @@
+include:
+  - market-stats/compose.yml

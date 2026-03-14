@@ -3,6 +3,7 @@ include:
   - analyzers/compose.yml
   - solver/compose.yml
   - adapters/compose.yml
+  - tools/compose.yml
 
 # infrastructure
 services:

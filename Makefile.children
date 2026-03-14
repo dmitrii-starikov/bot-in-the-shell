@@ -11,3 +11,6 @@
 
 # Adapters
 -include adapters/telegram-notifier/Makefile
+
+# Tools
+-include tools/market-stats/Makefile
