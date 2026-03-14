@@ -25,7 +25,7 @@ DB_USER   = os.environ["DB_USER"]
 DB_PASS   = os.environ["DB_PASSWORD"]
 
 KAFKA_URL = os.environ.get("KAFKA_URL", "kafka:9092")
-TOPIC     = os.environ.get("KAFKA_TOPIC", "market.price")
+TOPIC     = os.environ.get("KAFKA_TOPIC", "collectors.market.price")
 
 YEAR_FROM = int(os.environ.get("YEAR_FROM", "2017"))
 YEAR_TO   = int(os.environ.get("YEAR_TO",   "2026"))
@@ -54,7 +54,7 @@ def init_db(conn):
     """Создаёт таблицу если не существует."""
     with conn.cursor() as cur:
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS historic_coinmarketcap_daily_candles (
+            CREATE TABLE IF NOT EXISTS collectors_history_coinmarketcap_daily_candles (
                 id             SERIAL PRIMARY KEY,
                 coin           VARCHAR(10)  NOT NULL,
                 date           DATE         NOT NULL,
@@ -72,12 +72,12 @@ def init_db(conn):
             )
         """)
         conn.commit()
-    print("[db] ✓ Таблица historic_coinmarketcap_daily_candles готова")
+    print("[db] ✓ Таблица collectors_history_coinmarketcap_daily_candles готова")
 
 
 def insert_candle(cur, coin: str, doc: dict):
     cur.execute("""
-        INSERT INTO historic_coinmarketcap_daily_candles
+        INSERT INTO collectors_history_coinmarketcap_daily_candles
             (coin, date, open_price, high_price, low_price, close_price,
              avg_price, volume, market_cap, time_open, time_close)
         VALUES
@@ -220,7 +220,7 @@ def do_publish(coin: str | None = None, date_from: str | None = None, date_to: s
     where = ("WHERE " + " AND ".join(filters)) if filters else ""
 
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(f"SELECT * FROM historic_coinmarketcap_daily_candles {where} ORDER BY coin, date", params)
+        cur.execute(f"SELECT * FROM collectors_history_coinmarketcap_daily_candles {where} ORDER BY coin, date", params)
         rows = cur.fetchall()
 
     print(f"[publish] Публикую {len(rows)} свечей в {TOPIC}...")
@@ -308,7 +308,7 @@ def do_publish_simulation(
     where = ("WHERE " + " AND ".join(filters)) if filters else ""
 
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(f"SELECT * FROM historic_coinmarketcap_daily_candles {where} ORDER BY coin, date", params)
+        cur.execute(f"SELECT * FROM collectors_history_coinmarketcap_daily_candles {where} ORDER BY coin, date", params)
         rows = cur.fetchall()
 
     total_ticks = len(rows) * 5

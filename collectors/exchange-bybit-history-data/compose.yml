@@ -1,0 +1,16 @@
+services:
+  exchange-bybit-history-data:
+    build: .
+    container_name: ${COMPOSE_PROJECT_NAME}-exchange-bybit-history-data
+    env_file:
+      - ../../.env
+      - .env
+    volumes:
+      - ./tmp:/app/tmp
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    name: ${COMPOSE_PROJECT_NAME}-network
+    external: true

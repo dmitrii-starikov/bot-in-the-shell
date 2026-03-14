@@ -1,2 +1,4 @@
 include:
   - exchange-coinmarketcap-history-data/compose.yml
+  - exchange-alternative-fear-greed/compose.yml
+  - exchange-bybit-history-data/compose.yml
