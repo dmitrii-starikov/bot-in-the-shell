@@ -276,6 +276,129 @@ def report_combined(conn):
         print(f"    Направление: чем выше жадность → тем лучше следующий день (momentum)")
 
 
+
+# ─── Оценка sentiment-analyzer на исторических данных ────────────────────────
+
+def report_sentiment_eval(conn):
+    header(f"ОЦЕНКА SENTIMENT-ANALYZER — {COIN.upper()} цена vs Fear & Greed")
+
+    # Границы зон (те же что в sentiment-analyzer)
+    EXTREME_FEAR_MAX = 24
+    FEAR_MAX         = 46
+    NEUTRAL_MAX      = 54
+    GREED_MAX        = 75
+
+    def fg_signal(v):
+        if v <= EXTREME_FEAR_MAX:   return "BULLISH", "Extreme Fear"
+        elif v <= FEAR_MAX:         return "BULLISH", "Fear"
+        elif v <= NEUTRAL_MAX:      return "NEUTRAL", "Neutral"
+        elif v <= GREED_MAX:        return "BEARISH", "Greed"
+        else:                       return "BEARISH", "Extreme Greed"
+
+    def fg_confidence(v):
+        if v <= EXTREME_FEAR_MAX:
+            return 0.9 - 0.2 * (v / EXTREME_FEAR_MAX)
+        elif v <= FEAR_MAX:
+            t = (v - EXTREME_FEAR_MAX) / (FEAR_MAX - EXTREME_FEAR_MAX)
+            return 0.5 - 0.2 * t
+        elif v <= NEUTRAL_MAX:
+            mid = (FEAR_MAX + NEUTRAL_MAX) / 2
+            t   = abs(v - mid) / ((NEUTRAL_MAX - FEAR_MAX) / 2)
+            return 0.1 + 0.2 * t
+        elif v <= GREED_MAX:
+            t = (v - NEUTRAL_MAX) / (GREED_MAX - NEUTRAL_MAX)
+            return 0.3 + 0.2 * t
+        else:
+            t = (v - GREED_MAX) / (100 - GREED_MAX)
+            return 0.7 + 0.2 * t
+
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("""
+            SELECT
+                f.date,
+                f.value        AS fg_value,
+                f.classification,
+                p.close_price,
+                LEAD(p.close_price, 1)  OVER (ORDER BY p.date) AS close_1d,
+                LEAD(p.close_price, 3)  OVER (ORDER BY p.date) AS close_3d,
+                LEAD(p.close_price, 7)  OVER (ORDER BY p.date) AS close_7d,
+                LEAD(p.close_price, 14) OVER (ORDER BY p.date) AS close_14d
+            FROM collectors_fear_greed_index f
+            JOIN collectors_history_coinmarketcap_daily_candles p
+                ON p.date = f.date AND p.coin = %s
+            ORDER BY f.date
+        """, (COIN,))
+        rows = [dict(r) for r in cur.fetchall()]
+
+    # Только строки где есть все горизонты
+    rows = [r for r in rows if all(r[f"close_{h}d"] for h in [1, 3, 7, 14])]
+    print(f"\n  Дней с полными данными: {len(rows)}")
+
+    HORIZONS = [1, 3, 7, 14]
+
+    # Результаты по зонам и горизонтам
+    zones_order = ["Extreme Fear", "Fear", "Neutral", "Greed", "Extreme Greed"]
+    zones = {z: [] for z in zones_order}
+
+    for r in rows:
+        _, zone = fg_signal(r["fg_value"])
+        conf    = fg_confidence(r["fg_value"])
+        signal, _ = fg_signal(r["fg_value"])
+
+        entry = {
+            "signal":     signal,
+            "confidence": conf,
+            "price":      r["close_price"],
+        }
+        for h in HORIZONS:
+            future = r[f"close_{h}d"]
+            pct    = (future - r["close_price"]) / r["close_price"] * 100
+            correct = (signal == "BULLISH" and pct > 0) or                       (signal == "BEARISH" and pct < 0)
+            entry[f"pct_{h}d"]     = pct
+            entry[f"correct_{h}d"] = correct
+        zones[zone].append(entry)
+
+    # Таблица точности по зонам
+    for h in HORIZONS:
+        print(f"\n  Точность сигнала через +{h} дней:")
+        print(f"  {'Зона':<14} {'Сигнал':<8} {'Дней':>5} {'Точность':>9} {'Avg %':>9} {'Conf avg':>9}")
+        sep()
+        for zone in zones_order:
+            entries = zones[zone]
+            if not entries:
+                continue
+            signal   = entries[0]["signal"]
+            correct  = sum(1 for e in entries if e[f"correct_{h}d"])
+            accuracy = correct / len(entries) * 100
+            avg_pct  = mean([e[f"pct_{h}d"] for e in entries])
+            avg_conf = mean([e["confidence"] for e in entries])
+            # корректируем знак для BEARISH (ожидаем падение)
+            signed_pct = avg_pct if signal == "BULLISH" else -avg_pct
+            print(f"  {zone:<14} {signal:<8} {len(entries):>5} "
+                  f"{accuracy:>8.1f}% "
+                  f"{signed_pct:>+8.2f}% "
+                  f"{avg_conf:>9.2f}")
+
+    # Confidence vs точность (горизонт 7 дней)
+    h = 7
+    directional = [e for z in zones.values() for e in z if e["signal"] != "NEUTRAL"]
+    high_conf = [e for e in directional if e["confidence"] >= 0.6]
+    low_conf  = [e for e in directional if e["confidence"] <  0.6]
+
+    if high_conf and low_conf:
+        acc_h = sum(1 for e in high_conf if e[f"correct_{h}d"]) / len(high_conf) * 100
+        acc_l = sum(1 for e in low_conf  if e[f"correct_{h}d"]) / len(low_conf)  * 100
+        print(f"\n  Confidence vs точность (горизонт +{h}д):")
+        print(f"    conf ≥ 0.6:  {acc_h:.1f}%  (n={len(high_conf)})")
+        print(f"    conf <  0.6: {acc_l:.1f}%  (n={len(low_conf)})")
+        diff = acc_h - acc_l
+        if diff > 3:
+            print(f"    ✓ Высокий confidence точнее на {diff:.1f}%")
+        elif diff < -3:
+            print(f"    ✗ Высокий confidence менее точен на {abs(diff):.1f}%")
+        else:
+            print(f"    ≈ Confidence не влияет на точность ({diff:+.1f}%)")
+
 # ─── Точка входа ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -289,5 +412,7 @@ if __name__ == "__main__":
             report_fear_greed(conn)
         if cmd in ("combined", "all"):
             report_combined(conn)
+        if cmd in ("sentiment", "all"):
+            report_sentiment_eval(conn)
     finally:
         conn.close()

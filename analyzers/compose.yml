@@ -1,3 +1,4 @@
 include:
   - sigma_analyzer/compose.yml
   - volatility_analyzer/compose.yml
+  - sentiment_analyzer/compose.yml

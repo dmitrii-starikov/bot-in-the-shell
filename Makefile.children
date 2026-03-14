@@ -6,6 +6,7 @@
 # Analyzers
 -include analyzers/sigma_analyzer/Makefile
 -include analyzers/volatility_analyzer/Makefile
+-include analyzers/sentiment_analyzer/Makefile
 
 # Solver
 

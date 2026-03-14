@@ -13,6 +13,9 @@ market-stats-fear:
 market-stats-combined:
 	$(_MS_DC) run --rm market-stats python src/main.py combined
 
+market-stats-sentiment:
+	$(_MS_DC) run --rm market-stats python src/main.py sentiment
+
 market-stats-build:
 	$(_MS_DC) build
 
