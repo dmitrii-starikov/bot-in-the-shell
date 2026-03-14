@@ -13,7 +13,7 @@ import os, json, time
 from kafka import KafkaConsumer
 
 KAFKA_URL   = os.environ["KAFKA_URL"]
-TOPIC       = os.environ.get("KAFKA_TOPIC", "notifications")
+TOPIC       = os.environ.get("KAFKA_TOPIC", "adapters.notifications")
 TOKEN       = os.environ["TELEGRAM_TOKEN"]
 CHANNEL_ID  = os.environ.get("TELEGRAM_DEFAULT_CHANNEL_ID", "")
 

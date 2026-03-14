@@ -3,16 +3,13 @@ services:
     build: .
     container_name: ${COMPOSE_PROJECT_NAME}-telegram-notifier
     restart: unless-stopped
-    environment:
-      KAFKA_URL: kafka:9092
-      KAFKA_TOPIC: notifications
-      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
-      TELEGRAM_CHANNEL_ID: ${TELEGRAM_DEFAULT_CHANNEL_ID}
-      LOGGED_LEVELS: ${TELEGRAM_LOGGED_LIST}
+    env_file:
+      - ../../.env
+      - .env
     networks:
       - bot-network
-    depends_on:
-      - kafka
+    #depends_on:
+    #  - kafka
 
 networks:
   bot-network:
