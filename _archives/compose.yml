@@ -1,0 +1,111 @@
+services:
+################################################################
+##################### COMMON RESOURCES #########################
+################################################################
+  # sudo docker exec -it ${PROJECT_PREFIX}-redis redis-cli
+  redis:
+    image: redis:latest
+    container_name: ${PROJECT_PREFIX}-redis
+    restart: unless-stopped
+    #user: "${CURRENT_UID:-1000}:${CURRENT_GID:-1000}"
+    ports:
+      - "6389:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - bot-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.5.3
+    container_name: ${PROJECT_PREFIX}-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - cluster.name=${PROJECT_PREFIX}-cluster
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9201:9200"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s -XGET http://localhost:9200/_cluster/health?pretty | grep status | grep -q '\\(green\\|yellow\\)'"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - bot-network
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - bot-es-data:/usr/share/elasticsearch/data
+
+  postgres:
+    image: postgres:latest
+    container_name: ${PROJECT_PREFIX}-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres-db
+    ports:
+      - "5482:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - bot-network
+    volumes:
+      - bot-postgresql-data:/var/lib/postgresql/data
+
+################################################################
+##################### CODE INTERPRETERS ########################
+################################################################
+  python:
+    build:
+      context: ./docker/python
+      dockerfile: Dockerfile
+    container_name: ${PROJECT_PREFIX}-python
+    restart: unless-stopped
+    user: "${CURRENT_UID:-1000}:${CURRENT_GID:-1000}"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - bot-network
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import sys; sys.exit(0)" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+################################################################
+#################### NETWORKS & VOLUMES ########################
+################################################################
+networks:
+  bot-network:
+    external: true
+    name: ${PROJECT_PREFIX}-network
+
+volumes:
+  bot-es-data:
+    name: ${PROJECT_PREFIX}-es-data
+  bot-postgresql-data:
+    name: ${PROJECT_PREFIX}-postgresql-data

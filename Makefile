@@ -21,8 +21,8 @@ reset: remove start
 restart: stop start
 
 save-context:
-	@mkdir -p context
-	@OUT=context/context.md; \
+	@mkdir -p _context
+	@OUT=_context/context.md; \
 	echo "# Project Context" > $$OUT; \
 	echo "_Generated: $$(date '+%Y-%m-%d %H:%M:%S')_" >> $$OUT; \
 	echo "" >> $$OUT; \
@@ -32,7 +32,7 @@ save-context:
 	find . -not -path '*/\.*' \
 	       -not -path '*/node_modules/*' \
 	       -not -path '*/tmp/*' \
-	       -not -path '*/context/*' \
+	       -not -path '*/_context/*' \
 	       -not -path '*/__pycache__/*' \
 	       -not -path '*/_archives/*' \
 	       | sort | sed 's|^\./||' >> $$OUT; \
@@ -44,7 +44,7 @@ save-context:
 	        \( -name "*.py" -o -name "*.yml" -o -name "Makefile" -o -name "Dockerfile" -o -name "*.proto" -o -name "*.md" \) \
 	        -not -path '*/\.*' \
 	        -not -path '*/tmp/*' \
-	        -not -path '*/context/*' \
+	        -not -path '*/_context/*' \
 	        -not -path '*/__pycache__/*' \
 	        -not -path '*/_archives/*' \
 	        | sort); do \
