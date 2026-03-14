@@ -1,0 +1,15 @@
+services:
+  volatility-analyzer:
+    build: .
+    container_name: ${COMPOSE_PROJECT_NAME}-volatility-analyzer
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+      - .env
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    name: ${COMPOSE_PROJECT_NAME}-network
+    external: true

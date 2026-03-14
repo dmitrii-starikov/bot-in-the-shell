@@ -1,8 +1,11 @@
 # Collectors
 -include collectors/exchange-coinmarketcap-history-data/Makefile
+-include collectors/exchange-alternative-fear-greed/Makefile
+-include collectors/exchange-bybit-history-data/Makefile
 
 # Analyzers
 -include analyzers/sigma_analyzer/Makefile
+-include analyzers/volatility_analyzer/Makefile
 
 # Solver
 

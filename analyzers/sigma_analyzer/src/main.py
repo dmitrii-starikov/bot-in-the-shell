@@ -1,8 +1,8 @@
 """
 sigma-analyzer — DEVIATION сигнал на основе стандартного отклонения цены.
 
-Читает:  market.price
-Пишет:  signal.out
+Читает:  collectors.market.price
+Пишет:  analyzers.signal.out
 
 Логика (из старого кода, поле deviationAvgPrice):
   - Накапливает цены в скользящем окне N тиков
@@ -25,8 +25,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 KAFKA_URL  = os.environ.get("KAFKA_URL",  "kafka:9092")
-IN_TOPIC   = os.environ.get("IN_TOPIC",   "market.price")
-OUT_TOPIC  = os.environ.get("OUT_TOPIC",  "signal.out")
+IN_TOPIC   = os.environ.get("IN_TOPIC",   "collectors.market.price")
+OUT_TOPIC  = os.environ.get("OUT_TOPIC",  "analyzers.signal.out")
 ASSET      = os.environ.get("ASSET",      "ETH")
 QUOTE      = os.environ.get("QUOTE",      "USDT")
 WINDOW     = int(os.environ.get("WINDOW", "20"))   # тиков в окне
